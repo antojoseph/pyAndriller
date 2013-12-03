@@ -37,9 +37,9 @@ ANDRILLER_VERSION = "alpha-1.1.1"
 A_BUILD_DATE = "03/12/2013"
 
 # Intro info
-print("\033[93m>>>>>>>>>> Andriller version: %s\033[0m" % ANDRILLER_VERSION)
-print("\033[93m>>>>>>>>>> Build date: %s\033[0m" % A_BUILD_DATE)
-print("\033[93m>>>>>>>>>> http://android.saz.lt\033[0m")
+print(">>>>>>>>>> Andriller version: %s" % ANDRILLER_VERSION)
+print(">>>>>>>>>> Build date: %s" % A_BUILD_DATE)
+print(">>>>>>>>>> http://android.saz.lt")
 
 REPORT = []		# List to be populated for generating the REPORT.html file
 
@@ -56,30 +56,35 @@ if OS_CHECK == 'linux' or OS_CHECK == 'linux2':
 		if os.path.isfile(ADB) == True:
 			os.chmod(ADB, '0755')
 		else:
-			sys.exit(download_adb)
+			input(download_adb + "\n Press 'Enter' to exit.")
+			sys.exit()
 elif OS_CHECK == 'win32':
 	ADB = "adb.exe"
 	SEP = '\\'
 	if os.path.isfile(ADB) == False:
-		sys.exit(download_adb)
+		input(download_adb + "\n Press 'Enter' to exit.")
+		sys.exit()
 elif OS_CHECK == 'darwin':
 	ADB = "./adb_mac"
 	SEP = '/'
 	if os.path.isfile(ADB) == False:
-		sys.exit(download_adb)
+		input(download_adb + "\n Press 'Enter' to exit.")
+		sys.exit()
 try:
 	ADB; co([ADB, 'start-server'])
 except NameError:
-	sys.exit(" Cannot determine OS!")
+	input(" ERROR! Cannot determine OS!\n Press 'Enter' to exit.")
+	sys.exit()
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Unrooted (shell) devices, to print device information, limited extractions 
 #
-print("\033[94m>>>>>>>>>> General Device Information.\033[0m")
+print(">>>>>>>>>> General Device Information.")
 
 # Check for connected Android device
 if 'unknown' in co([ADB, 'get-state']).decode('UTF-8'):
-	sys.exit("\033[91m No Android device found!\033[0m")
+	input(" No Android device found!\n Press 'Enter' to exit.")
+	sys.exit()
 else:
 	ADB_SER = co([ADB, 'get-serialno']).decode('UTF-8').replace('\n', '').replace('\r', '')
 	print(" ADB serial: " + ADB_SER); REPORT.append(["ADB serial", ADB_SER])
@@ -97,7 +102,8 @@ else:
 try:
 	print(" Shell permissions: " + PERM); REPORT.append(["Shell permissions", PERM])
 except NameError:
-	sys.exit("\033[91m Android permission cannot be established!\033[0m")
+	input("  Android permission cannot be established!\n Press 'Enter' to exit.")
+	sys.exit()
 
 BUILDPROP = co([ADB, 'shell', 'cat', '/system/build.prop']).decode('UTF-8')
 
@@ -203,9 +209,9 @@ for acc in all_acc:
 	acc = acc0[1]+": "+acc0[0]
 	ACCOUNTS.append(acc)
 if ACCOUNTS != '':
-	print("\033[94m>>>>>>>>>> Sync'ed Accounts.\033[0m")
+	print(">>>>>>>>>> Sync'ed Accounts.")
 	for account in ACCOUNTS:
-		print(account)
+		print(' ' + str(account))
 	REPORT.append(["Accounts", ACCOUNTS])
 
 # Create output directory
@@ -216,13 +222,14 @@ try:
 	os.mkdir(OUTPUT)
 	os.mkdir(OUTPUT+SEP+'db')
 except:
-	sys.exit(" Insufficient permissions to create a folder in this directory!")
+	input(" Insufficient permissions to create a folder in this directory!\n Press 'Enter' to exit.")
+	sys.exit()
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # ROOT EXTRACTION
 #
 if 'root' in PERM:
-	print("\033[94m>>>>>>>>>> Downloading databases...\033[0m")
+	print(">>>>>>>>>> Downloading databases...")
 
 #
 # DATABASE EXTRACTION
@@ -895,7 +902,7 @@ def decode_databases(DLLS):
 	for dec in decoders:
 		if dec[1] in DLLS:
 			try:
-				print('\033[95m Decoding: ' + dec[1] + '\033[0m', end='\r')
+				print(' Decoding: ' + dec[1], end='\r')
 				dec[0]()
 			except:
 				pass
@@ -903,13 +910,13 @@ def decode_databases(DLLS):
 
 
 if DLLS != []:
-	print("\033[94m>>>>>>>>>> Decoding data...\033[0m")
+	print(">>>>>>>>>> Decoding data...")
 	decode_databases(DLLS)
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # REPORTING
 #
-print("\033[94m>>>>>>>>>> Generating report:\033[0m")
+print(">>>>>>>>>> Generating report:")
 
 file_handle = open(OUTPUT+SEP+'REPORT.html', 'w', encoding='UTF-8')
 
@@ -930,4 +937,5 @@ file_handle.write(REP_FOOTER)
 file_handle.close()
 
 # Print generated report path:
-print('\033[92m'+os.getcwd()+SEP+OUTPUT+'REPORT.html\033[0m')
+print(' ' + os.getcwd()+SEP+OUTPUT+'REPORT.html')
+input(" Completed! Press 'Enter' to exit.")
