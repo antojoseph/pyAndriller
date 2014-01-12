@@ -1,47 +1,91 @@
-pyAndriller
-===========
+Andriller.py
+============
 
-Andriller performs read-only, forensically sound, non-destructive acquisition from (rooted) Android devices. The executable is run from a terminal or by executing directly; it produces results in the terminal window, and a report in a HTML format.
+# SUMMARY
 
-# Usage:
+Andriller is a multi-platform forensic tool, that performs read-only, forensically sound, non-destructive acquisition from (rooted) Android devices. The executable is run from a terminal or by executing directly; it produces premilinary results in the terminal window, and a report in a HTML format.
 
-Connect an Android device by a USB cable, have USB Debugging enabled; execute Andriller:
+# DISCLAIMER
 
-$ ./Andriller.py
+Andriller comes with absolutely no warranty. Even though Andriller was written in a way to be a forensically sound read-only utility, I do not take any responsibility to any damage or harm caused to your computer systems or your Android devices, which may be believed to have been caused by executing Andriller. I also do not take any responsibility of any unsolicited, non-consensual or unlawful misuses of this software. It is the end user's responsibility to believe an appropriate consent or a lawful excuse was obtained if the utility is used with an other's Android devices, and they are aware what the software does.
 
-for Windows (must have Python 3.x installed):
-python Andriller.py
-Andriller should run, download any data, and decode it all at once. Content download is supported for rooted devices only.
-
-Note: Android version 4.2.2+ requires to authorise the PC to accept RSA fingerprint. Please do so, and tick the box to remember for future. 
-Note: Devices with Superuser or SuperSU App require to authorise root access from an unlocked screen. Please grand permissions if requested.
-
-# Description:
+# DESCRIPTION
 
 Once andriller is executed, it will produce permilinary results in the terminal window; for rooted devices it will download and decode the content automatically. It will produce a new folder in the location where it was executed, where the main "REPORT.html" file can be opened in a web browser.
 
-# Supported data extraction:
 
-adb serial, shell permissions, device manufacturer/model, IMEI, Android version, build number, Wifi mac, Bluetooth mac, Bluetooth name, Last known GPS location, Time & Date, Synchronised Accounts, SIM card ICCID/MSISDN/Carrier (not all devices supported, mainly SGS#);
+# USAGE INSTRUCTIONS
 
-For rooted devices only: Pattern lock, PIN lock (up to 4 digits only), Contacts, Call logs, SMS messages, WhatsApp App (contacts, messages), Facebook App (messages, viewed photographs).
+Do not delete any files from this directory, or change anything else, as this may prevent you from successfully executing the program. Connect an Android device via USB with the USB debugging (ADB) enabled. If Android version 4.2.2+, tick remember and accept RSA fingerprint on the screen. If Superuser install, give it root permissions. 
 
-# Disclaimer:
+++ Microsoft Windows ++
+- (Easy way)Run the compiled executable 'Andriller.exe'
+- (Hard way)install Python 3.3.x ,download from http://www.python.org/download/
+- once installed, run the Andriller.py from command prompt
+- if your system doesn't execute Andriller.py as a Python program:
+	C:\Python33\python.exe [path_to]\Andriller.py
 
-Andriller comes with absolutely no warranty. Even though Andriller was written in a way to be a forensically sound read-only utility, I do not take any responsibility to any damage or harm caused to your computer systems or your Android devices, which may be believed to have been caused by executing Andriller. I also do not take any responsibility of any unsolicited, non-consensual or unlawful misuses of this utility. It is the end user's responsibility to believe an appropriate consent or a lawful excuse was obtained if the utility is used with an other's Android devices, and they are aware what the utility does.
+++ Linux OS ++
+- make sure python3 is installed on your system; it comes as standard for Ubuntu, but not for others, like Fedora.
+- for i386/i586/i686 (32-bit) systems, an executable './adb' comes with Andriller
+- it is highly advisable to install 'adb' before executing Andriller:
+	for Ubuntu:		$ sudo apt-get install android-tools-adb
+	for Fedora:		# yum install adb
+	for openSUSE:	# yast -i android-tools
+- run executable 'Andriller.py' in a terminal:
+	$ ./Andriller.py
 
-# Troubleshooting:
+++ Mac OSX ++
+- install Python 3.x ,download from http://www.python.org/download/
+- for most Macs, the './adb_mac' dependency should work for Android versions >=4.1.2; for higher versions, obtain the latest adb from Android SDK (if you do, remember to rename it to 'adb_mac', and replace it with the one Andriller came with)
+- execute Andriller in a terminal:
+	$ python ./Andriller.py
 
-For andriller to work, you may need the following packages to be installed (if not already installed): adb. You can install them manually.
+# COMPATABILITY AND SUPPORT
 
-For Ubuntu (depending on distribution, must enable 'universe' in software sources first, and/or add this PPA for latest adb version):
-$ sudo add-apt-repository ppa:phablet-team/tools && sudo apt-get update
+Andriller was tested on rooted Android devices running OS versions:
+2.2.x, 2.3.x, 4.0.x, 4.1.x, 4.2.2, 4.3, 4.4.2
 
-$ sudo apt-get install android-tools-adb
+Andriller has support for the following features.
 
-For Fedora:
-$ sudo yum install adb
+Non-root devices:
+- Android device make and model
+- IMEI, build version, OS version
+- Wifi mac address
+- Time and date check
+- SIM card details (for a some Galaxy Sx devices only)
+- Synchronised accounts
 
-For openSUSE:
-$ sudo yast -i android-tools
-For Android devices with version 4.2.2+, the latest adb version is required (version 1.0.31). Check which version you have installed: adb version
+Rooted devices (root adbd or via 'su' binary):
+- Security lockscreen pattern gesture extraction (decoding online)
+- Security lockscreen PIN code cracking (up to 8 digits long)
+- Wi-Fi passwords (WPA-PSK/WEP)
+- Synchronised accounts and profile picture
+- Bluetooth mac address and name
+- Phonebook contacts
+- Call logs register
+- Call logs (Samsung) register
+- SMS messages
+- Android browser saved passwords
+- Android browser browsing history
+- Google Chrome saved passwords
+- Google Chrome browsing history
+- Facebook* friends list
+- Facebook* chat messages
+- Facebook* user viewed photographs
+- Facebook* user notifications
+- WhatsApp* contacts list
+- WhatsApp* chat messages
+- Kik Messenger* chat messages
+- BBM* chat messages (Blackberry Messenger)
+
+\* = if an Application is installed
+
+# CONTACTS
+
+For contact, to submit bugs, or suggestions:
+
+http://android.saz.lt
+
+den (at) saz (dot) lt
+
