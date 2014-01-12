@@ -181,8 +181,8 @@ except:
 
 # SIM card extraction 
 SIM_LOC = '/data/system/SimCard.dat'
-if co([ADB, 'shell', 'ls', SIM_LOC]).decode('UTF-8').replace('\r', '').replace('\n', '') == SIM_LOC:
-	SIM_DATA = co([ADB, 'shell', 'cat', SIM_LOC]).decode('UTF-8').replace('\r', '')
+if co([ADB, 'shell', '"ls', SIM_LOC+'"']).decode('UTF-8').replace('\r', '').replace('\n', '') == SIM_LOC:
+	SIM_DATA = co([ADB, 'shell', '"cat', SIM_LOC+'"']).decode('UTF-8').replace('\r', '')
 	for sim_d in SIM_DATA.split('\n'):
 		if 'CurrentSimSerialNumber' in sim_d:
 			SIM_ICCID = sim_d.split('=')[1]
@@ -268,8 +268,6 @@ DBLS = [
 '/data/data/com.android.chrome/app_chrome/Default/Login Data',
 '/data/data/com.android.chrome/app_chrome/Default/History',
 '/data/data/com.android.chrome/app_chrome/Default/Archived History',
-#'/data/data/com.android.chrome/app_chrome/Default/Bookmarks',	# TODO NEXT
-#'/data/data/com.android.chrome/app_chrome/Default/Web Data',
 '/data/data/com.android.browser/databases/browser2.db',
 '/data/data/com.android.browser/databases/webview.db',
 '/data/system/packages.list',	# No decoder
@@ -313,32 +311,6 @@ def download_database(DB_PATH):
 if 'root' in PERM:
 	for db in DBLS:
 		download_database(db)
-
-# Download content of a folder  # # # # # # # # # # # # # # # #
-def download_folder(R_PATH,L_PATH):		# Remote path, create new local folder
-	os.mkdir(OUTPUT+L_PATH)
-	if 'su' in PERM:
-		for ipull in co([ADB, 'shell', 'su', '-c', 'ls', str(R_PATH)]).decode('UTF-8').split('\r\n')[:-1:]:
-			co([ADB, 'shell', 'su', '-c', 'dd', 'if='+str(R_PATH)+repr(ipull), 'of=/data/local/tmp/'+repr(ipull)])
-			co([ADB, 'shell', 'su', '-c', 'chmod', '777', '/data/local/tmp/'+repr(ipull)])
-			co([ADB, 'pull', '/data/local/tmp/'+str(ipull), OUTPUT+L_PATH+SEP+str(ipull)])
-			co([ADB, 'shell', 'su', '-c', 'rm', '/data/local/tmp/'+repr(ipull)])
-	else:
-		for ipull in co([ADB, 'shell', 'ls', str(R_PATH)]).decode('UTF-8').split('\r\n')[:-1:]:
-			co([ADB, 'pull', R_PATH, OUTPUT+L_PATH+SEP+str(ipull)])
-
-# Download a remote file  # # # # # # # # # # # # # # # # # # #
-def download_file(R_FILE,L_PATH):
-	if not os.path.isdir(OUTPUT+L_PATH):
-		os.mkdir(OUTPUT+L_PATH)
-	rFile = str(R_FILE.split('/')[-1])
-	if 'su' in PERM:
-		co([ADB, 'shell', 'su', '-c', 'dd', 'if='+str(R_FILE), 'of=/data/local/tmp/'+str(rFile)])
-		co([ADB, 'shell', 'su', '-c', 'chmod', '777', '/data/local/tmp/'+str(rFile)])
-		co([ADB, 'pull', '/data/local/tmp/'+str(rFile), OUTPUT+L_PATH+SEP+str(rFile)])
-		co([ADB, 'shell', 'su', '-c', 'rm', '/data/local/tmp/'+str(rFile)])
-	else:
-		co([ADB, 'pull', R_FILE, OUTPUT+L_PATH+SEP+rFile])
 
 # Unix timestamp to date converter  # # # # # # # # # # # # # #
 def unix_to_utc(unix_stamp):
