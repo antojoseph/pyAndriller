@@ -3,7 +3,7 @@ Andriller.py
 
 # SUMMARY
 
-Andriller is a multi-platform forensic tool, that performs read-only, forensically sound, non-destructive acquisition from (rooted) Android devices. The executable is run from a terminal or by executing directly; it produces premilinary results in the terminal window, and a report in a HTML format.
+Andriller is a multi-platform forensic tool, that performs read-only, forensically sound, non-destructive acquisition from Android devices. The executable is run from a terminal or by executing directly; it produces premilinary results in the terminal window, and a report in a HTML format.
 
 # DISCLAIMER
 
@@ -16,11 +16,11 @@ Once andriller is executed, it will produce permilinary results in the terminal 
 
 # USAGE INSTRUCTIONS
 
-Do not delete any files from this directory, or change anything else, as this may prevent you from successfully executing the program. Connect an Android device via USB with the USB debugging (ADB) enabled. If Android version 4.2.2+, tick remember and accept RSA fingerprint on the screen. If Superuser install, give it root permissions. 
+Do not delete any files from this directory, or change anything else, as this may prevent you from successfully executing the program. Connect an Android device via USB with the USB debugging (ADB) enabled. If Android version 4.2.2+, tick remember and accept RSA fingerprint on the screen. If Superuser is installed, give it root permissions when asked. 
 
 ++ Microsoft Windows ++
-- (Easy way)Run the compiled executable 'Andriller.exe'
-- (Hard way)install Python 3.3.x ,download from http://www.python.org/download/
+- (Easy way)Run the compiled executable 'Andriller.exe'. That's it.
+- (Hard way)install Python 3.x ,download from http://www.python.org/download/
 - once installed, run the Andriller.py from command prompt
 - if your system doesn't execute Andriller.py as a Python program:
 	C:\Python33\python.exe [path_to]\Andriller.py
@@ -37,7 +37,7 @@ Do not delete any files from this directory, or change anything else, as this ma
 
 ++ Mac OSX ++
 - install Python 3.x ,download from http://www.python.org/download/
-- for most Macs, the './adb_mac' dependency should work for Android versions >=4.1.2; for higher versions, obtain the latest adb from Android SDK (if you do, remember to rename it to 'adb_mac', and replace it with the one Andriller came with)
+- for most Macs, the './adb_mac' version 1.0.31 is included; for higher versions, obtain the latest adb from Android SDK (if you do, remember to rename it to 'adb_mac', and replace it with the one Andriller came with)
 - execute Andriller in a terminal:
 	$ python ./Andriller.py
 
@@ -48,7 +48,7 @@ Andriller was tested on rooted Android devices running OS versions:
 
 Andriller has support for the following features.
 
-Non-root devices:
+Non-root devices (Android versions 2.x):
 - Android device make and model
 - IMEI, build version, OS version
 - Wifi mac address
@@ -56,9 +56,24 @@ Non-root devices:
 - SIM card details (for a some Galaxy Sx devices only)
 - Synchronised accounts
 
-Rooted devices (root adbd or via 'su' binary):
+Non-rooted devices (via backup method, Android versions 4.x and above)
+- Wi-Fi passwords (WPA-PSK/WEP)
+- Call logs (Samsung) register
+- Android browser saved passwords
+- Android browser browsing history
+- Google Chrome saved passwords
+- Google Chrome browsing history
+- Facebook* chat messages
+- Facebook* user viewed photographs
+- Facebook* user notifications
+- WhatsApp* contacts list
+- WhatsApp* chat messages
+- Kik Messenger* chat messages
+- BBM* chat messages (Blackberry Messenger)
+
+Rooted devices (via root adbd or 'su' binary, any Android versions):
 - Security lockscreen pattern gesture extraction (decoding online)
-- Security lockscreen PIN code cracking (up to 8 digits long)
+- Security lockscreen PIN code cracking (up to 8 digits)
 - Wi-Fi passwords (WPA-PSK/WEP)
 - Synchronised accounts and profile picture
 - Bluetooth mac address and name
@@ -70,7 +85,6 @@ Rooted devices (root adbd or via 'su' binary):
 - Android browser browsing history
 - Google Chrome saved passwords
 - Google Chrome browsing history
-- Facebook* friends list
 - Facebook* chat messages
 - Facebook* user viewed photographs
 - Facebook* user notifications
