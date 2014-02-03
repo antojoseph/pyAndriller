@@ -19,14 +19,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
-import sys
 import os
-import time
 import re
+import sys
+import time
 import hashlib
+import tarfile
 import sqlite3 as sq
 from json import loads
+from io import BytesIO
 from struct import pack
+from zlib import decompress
 from base64 import b64decode
 from binascii import hexlify
 from datetime import datetime
@@ -37,8 +40,8 @@ from webbrowser import open_new_tab
 
 # Setting variables
 __author__ = "Denis Sazonov"
-__version__ = "alpha-1.2.0"
-__build_date__ = "12-Jan-2014"
+__version__ = "alpha-1.3.0"
+__build_date__ = "03-Feb-2014"
 __website__ = "http://android.saz.lt"
 
 # Intro info print
@@ -121,7 +124,7 @@ except NameError:
 BUILDPROP = co([ADB, 'shell', 'cat', '/system/build.prop']).decode('UTF-8')
 for manuf in BUILDPROP.split('\n'):
 	if 'ro.product.manufacturer' in manuf:
-		DEVICE_MANUF = manuf.strip().split('=')[1]
+		DEVICE_MANUF = manuf.strip().split('=')[1].upper()
 for model in BUILDPROP.split('\n'):
 	if 'ro.product.model' in model:
 		DEVICE_MODEL = model.strip().split('=')[1]
@@ -240,8 +243,8 @@ except:
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # ROOT EXTRACTION
 #
-if 'root' in PERM:
-	print('{0:\u00B0^60}'.format(' Downloading databases '))
+#if 'root' in PERM:
+#	print('{0:\u00B0^60}'.format(' Downloading databases '))
 
 #
 # DATABASE EXTRACTION
@@ -281,6 +284,31 @@ DBLS = [
 '/data/misc/wifi/wpa_supplicant.conf',
 ]
 
+AB_DBLS = [
+#'apps/com.google.android.email/db/EmailProvider.db',	# Add support
+#'apps/com.google.android.email/db/EmailProviderBody.db',	# Add support
+'apps/com.android.providers.contacts/db/contacts2.db',
+'apps/com.android.providers.settings/f/flattened-data',
+'apps/com.android.providers.telephony/db/mmssms.db',
+'apps/com.sec.android.provider.logsprovider/db/logs.db',
+'apps/com.android.chrome/r/app_chrome/Default/Login Data',
+'apps/com.android.chrome/r/app_chrome/Default/History',
+'apps/com.android.chrome/r/app_chrome/Default/Archived History',
+'apps/com.android.chrome/r/app_chrome/Default/Login Data',
+'apps/com.android.browser/db/browser2.db',
+'apps/com.android.browser/db/webview.db',
+'apps/com.facebook.katana/db/fb.db',
+'apps/com.facebook.katana/db/contacts_db2',
+'apps/com.facebook.katana/db/threads_db2',
+'apps/com.facebook.katana/db/notifications.db',
+'apps/com.facebook.katana/db/notifications_db',
+'apps/com.facebook.katana/db/photos_db',
+'apps/com.whatsapp/db/wa.db',
+'apps/com.whatsapp/db/msgstore.db',
+'apps/kik.android/db/kikDatabase.db',
+'apps/com.bbm/f/bbmcore/master.db',
+]
+
 #
 # DOWNLOADING DATABASES
 SUC, QM, DLT = '', '', '/data/local/tmp/'
@@ -304,13 +332,45 @@ def download_database(DB_PATH):
 			with open(OUTPUT+'db'+SEP+'checksums.md5', 'a') as md5file:
 				md5file.write(DB_MD5+'\t'+str(DB_NAME)+'\n')
 		else:
-			ERRORS.append('Failed pulling {0} file from the device.'.format(DB_NAME))
+			ERRORS.append('Failed pulling {0} file from the device.'.fformat(DB_NAME))
 	else:
 		ERRORS.append('Remote file {0} is not present on the device.'.format(DB_NAME))
 
+# Extract databases from AB
+def android_backup_extractor():
+	AB_raw = open(OUTPUT+'backup.ab', 'rb')
+	AB_tar = tarfile.open(fileobj=BytesIO(decompress(AB_raw.read()[24:])))
+	for ab_item in AB_DBLS:
+		try:
+			ab_obj = AB_tar.getmember(ab_item)
+			DB_NAME = ab_item.split('/')[-1]
+			with open(OUTPUT+'db'+SEP+str(DB_NAME), 'wb') as file_h:
+				file_h.write(AB_tar.extractfile(ab_obj).read())
+			if os.path.isfile(OUTPUT+'db'+SEP+str(DB_NAME)) == True:
+				DB_MD5 = hashlib.md5(open(OUTPUT+'db'+SEP+str(DB_NAME), 'rb').read()).hexdigest()
+				DLLS.append(DB_NAME)
+				with open(OUTPUT+'db'+SEP+'checksums.md5', 'a') as md5file:
+					md5file.write(DB_MD5+'\t'+str(DB_NAME)+'\n')		
+		except:
+			pass
+	del AB_raw,AB_tar
+
+# Trigger download databases / android_backup
 if 'root' in PERM:
+	print('{0:\u00B0^60}'.format(' Data Extraction via Root '))
 	for db in DBLS:
 		download_database(db)
+else:
+	if int(ANDROID_VER[0]) >= 4:
+		print('{0:\u00B0^60}'.format(' Data Extraction via Android Backup '))
+		print('>>> Extraction via Android Backup method <<<\n>>> Unlock the screen and tap on "Back up my data" <<<')
+		try:
+			co([ADB, 'backup', '-all', '-f', OUTPUT+'backup.ab'])
+		except:
+			pass
+		if os.path.isfile(OUTPUT+'backup.ab'):
+			android_backup_extractor()
+			print(' Success! {0} databases extracted from backup.'.format(len(DLLS)))
 
 # Unix timestamp to date converter  # # # # # # # # # # # # # #
 def unix_to_utc(unix_stamp):
@@ -965,16 +1025,17 @@ def decode_masterdb(file_to_decode):
 	REPORT.append(['Applications data', '<a href="bbm_messenger.html">{0} ({1:,})</a>'.format(rep_title, len(bbm_data))])
 # # # # #
 
-# Decode 'wpa_supplicant.conf'  # # # # # # # # # # # # # # # #
+# Decode 'wpa_supplicant.conf'or 'flattened-data' # # # # # # #
 def decode_wifipw(file_to_decode):
 	rep_title = 'Wi-Fi Passwords'
-	wpa_raw = open(OUTPUT+'db'+SEP+file_to_decode, 'r').read()
+	wpa_raw = open(OUTPUT+'db'+SEP+file_to_decode, 'rb').read()
 	with open(OUTPUT+'wifi_passwords.html', 'w', encoding='UTF-8') as fileh:
 		fileh.write(REP_HEADER.format(_title=rep_title) + '<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th nowrap>SSID</th><th nowrap bgcolor="#FF6666">Password</th><th nowrap>Management</th></tr>\n')
-		wpa_data = re.findall('\{\n\t(.*?)\n\}', wpa_raw, re.DOTALL)
+		wpa_data = re.findall(b'\{\n\t(.*?)\n\}', wpa_raw, re.DOTALL)
+		wpa_data = [_.decode() for _ in wpa_data]
 		for wpa_rawitem in wpa_data:
 			wpa_item = wpa_rawitem.split('\n\t')
-			wpa_d = dict(zip([x.split('=')[0] for x in wpa_item],[x.split('=')[1] for x in wpa_item]))
+			wpa_d = dict(zip([_.split('=')[0] for _ in wpa_item],[_.split('=')[1] for _ in wpa_item]))
 			wpa = (wpa_d.get('ssid', '').strip('"'), wpa_d.get('psk', '').strip('"'), wpa_d.get('wep_key0', '').strip('"'), wpa_d.get('key_mgmt', ''))
 			fileh.write('<tr><td>{0}</td><td>{1}{2}</td><td>{3}</td></tr>\n'.format(*wpa))
 		fileh.write(REP_FOOTER)
@@ -1091,6 +1152,7 @@ decoders = [
 (decode_settingsdb, 'settings.db'),
 (decode_accountsdb, 'accounts.db'),
 (decode_wifipw, 'wpa_supplicant.conf'),
+(decode_wifipw, 'flattened-data'),
 (decode_webview, 'webview.db'),
 (decode_browser2, 'browser2.db'),
 (decode_logindata, 'Login Data'),
