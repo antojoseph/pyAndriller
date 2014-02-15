@@ -23,15 +23,15 @@ import os
 import re
 import sys
 import time
-import hashlib
 import tarfile
 import sqlite3 as sq
 from json import loads
 from io import BytesIO
 from struct import pack
 from zlib import decompress
+from hashlib import md5,sha1
 from base64 import b64decode
-from binascii import hexlify
+from binascii import hexlify,unhexlify
 from datetime import datetime
 from datetime import timedelta
 from subprocess import check_output as co
@@ -40,8 +40,8 @@ from webbrowser import open_new_tab
 
 # Setting variables
 __author__ = "Denis Sazonov"
-__version__ = "alpha-1.3.0"
-__build_date__ = "03-Feb-2014"
+__version__ = "alpha-1.3.1"
+__build_date__ = "15-Feb-2014"
 __website__ = "http://android.saz.lt"
 
 # Intro info print
@@ -135,7 +135,9 @@ except:
 	pass; ERRORS.append('Cannot get make and model.')
 
 # IMEI
-IMEI = co([ADB, 'shell', 'dumpsys', 'iphonesubinfo']).decode('UTF-8').split()[-1]
+for _ in co([ADB, 'shell', 'dumpsys', 'iphonesubinfo']).decode('UTF-8').split('\n'):
+	if 'Device ID' in _:
+		IMEI = _.split(' = ')[1]; break
 try:
 	print(" IMEI: " + IMEI); REPORT.append(["IMEI", IMEI])
 except:
@@ -252,6 +254,10 @@ except:
 # Database links
 
 DBLS = [
+'/data/data/com.android.email/databases/EmailProvider.db',
+'/data/data/com.android.email/databases/EmailProviderBody.db',
+'/data/data/com.google.android.email/databases/EmailProvider.db',
+'/data/data/com.google.android.email/databases/EmailProviderBody.db',
 '/data/data/com.android.providers.settings/databases/settings.db',
 '/data/data/com.android.providers.contacts/databases/contacts2.db',
 '/data/data/com.sec.android.provider.logsprovider/databases/logs.db',
@@ -285,8 +291,10 @@ DBLS = [
 ]
 
 AB_DBLS = [
-#'apps/com.google.android.email/db/EmailProvider.db',	# Add support
-#'apps/com.google.android.email/db/EmailProviderBody.db',	# Add support
+'apps/com.android.email/db/EmailProvider.db',
+'apps/com.android.email/db/EmailProviderBody.db',
+'apps/com.google.android.email/db/EmailProvider.db',	# Add support
+'apps/com.google.android.email/db/EmailProviderBody.db',	# Add support
 'apps/com.android.providers.contacts/db/contacts2.db',
 'apps/com.android.providers.settings/f/flattened-data',
 'apps/com.android.providers.telephony/db/mmssms.db',
@@ -317,24 +325,25 @@ if 'su' in PERM:	SUC, QM = 'su -c', '"'
 DLLS = []	# downloaded databases empty list
 def download_database(DB_PATH):
 	DB_NAME, DB_PATHa = DB_PATH.split('/')[-1], DB_PATH
-	if ' ' in DB_NAME:	DB_PATHa = DB_PATH.replace(DB_NAME, repr(DB_NAME))
-	if co([ADB, 'shell', SUC, QM+'ls', repr(DB_PATHa)+QM]).decode('UTF-8').replace('\r', '').replace('\n', '') == DB_PATH:
-		if 'su' in PERM:
-			co([ADB, 'shell', SUC, QM+'dd', 'if='+repr(DB_PATHa), 'of='+repr(DLT+repr(DB_NAME))+QM])
-			co([ADB, 'shell', SUC, QM+'chmod', '777', repr(DLT+repr(DB_NAME))+QM])
-			co([ADB, 'pull', DLT+str(DB_NAME), OUTPUT+'db'+SEP+str(DB_NAME)])
-			co([ADB, 'shell', SUC, QM+'rm', repr(DLT+repr(DB_NAME))+QM])
+	if DB_NAME not in DLLS:
+		if ' ' in DB_NAME:	DB_PATHa = DB_PATH.replace(DB_NAME, repr(DB_NAME))
+		if co([ADB, 'shell', SUC, QM+'ls', repr(DB_PATHa)+QM]).decode('UTF-8').replace('\r', '').replace('\n', '') == DB_PATH:
+			if 'su' in PERM:
+				co([ADB, 'shell', SUC, QM+'dd', 'if='+repr(DB_PATHa), 'of='+repr(DLT+repr(DB_NAME))+QM])
+				co([ADB, 'shell', SUC, QM+'chmod', '777', repr(DLT+repr(DB_NAME))+QM])
+				co([ADB, 'pull', DLT+str(DB_NAME), OUTPUT+'db'+SEP+str(DB_NAME)])
+				co([ADB, 'shell', SUC, QM+'rm', repr(DLT+repr(DB_NAME))+QM])
+			else:
+				co([ADB, 'pull', DB_PATH, OUTPUT+'db'+SEP+str(DB_NAME)])
+			if os.path.isfile(OUTPUT+'db'+SEP+str(DB_NAME)) == True:
+				DB_MD5 = md5(open(OUTPUT+'db'+SEP+str(DB_NAME), 'rb').read()).hexdigest()
+				DLLS.append(DB_NAME)
+				with open(OUTPUT+'db'+SEP+'checksums.md5', 'a') as md5file:
+					md5file.write(DB_MD5+'\t'+str(DB_NAME)+'\n')
+			else:
+				ERRORS.append('Failed pulling {0} file from the device.'.fformat(DB_NAME))
 		else:
-			co([ADB, 'pull', DB_PATH, OUTPUT+'db'+SEP+str(DB_NAME)])
-		if os.path.isfile(OUTPUT+'db'+SEP+str(DB_NAME)) == True:
-			DB_MD5 = hashlib.md5(open(OUTPUT+'db'+SEP+str(DB_NAME), 'rb').read()).hexdigest()
-			DLLS.append(DB_NAME)
-			with open(OUTPUT+'db'+SEP+'checksums.md5', 'a') as md5file:
-				md5file.write(DB_MD5+'\t'+str(DB_NAME)+'\n')
-		else:
-			ERRORS.append('Failed pulling {0} file from the device.'.fformat(DB_NAME))
-	else:
-		ERRORS.append('Remote file {0} is not present on the device.'.format(DB_NAME))
+			ERRORS.append('Remote file {0} is not present on the device.'.format(DB_NAME))
 
 # Extract databases from AB
 def android_backup_extractor():
@@ -344,13 +353,14 @@ def android_backup_extractor():
 		try:
 			ab_obj = AB_tar.getmember(ab_item)
 			DB_NAME = ab_item.split('/')[-1]
-			with open(OUTPUT+'db'+SEP+str(DB_NAME), 'wb') as file_h:
-				file_h.write(AB_tar.extractfile(ab_obj).read())
-			if os.path.isfile(OUTPUT+'db'+SEP+str(DB_NAME)) == True:
-				DB_MD5 = hashlib.md5(open(OUTPUT+'db'+SEP+str(DB_NAME), 'rb').read()).hexdigest()
-				DLLS.append(DB_NAME)
-				with open(OUTPUT+'db'+SEP+'checksums.md5', 'a') as md5file:
-					md5file.write(DB_MD5+'\t'+str(DB_NAME)+'\n')		
+			if DB_NAME not in DLLS:
+				with open(OUTPUT+'db'+SEP+str(DB_NAME), 'wb') as file_h:
+					file_h.write(AB_tar.extractfile(ab_obj).read())
+				if os.path.isfile(OUTPUT+'db'+SEP+str(DB_NAME)) == True:
+					DB_MD5 = md5(open(OUTPUT+'db'+SEP+str(DB_NAME), 'rb').read()).hexdigest()
+					DLLS.append(DB_NAME)
+					with open(OUTPUT+'db'+SEP+'checksums.md5', 'a') as md5file:
+						md5file.write(DB_MD5+'\t'+str(DB_NAME)+'\n')		
 		except:
 			pass
 	del AB_raw,AB_tar
@@ -380,6 +390,9 @@ def webkit_to_utc(webkit_stamp):
 	wtu0 = (datetime(1601,1,1) + timedelta(microseconds=int(webkit_stamp))).timetuple()
 	return unix_to_utc(int(time.mktime(wtu0)))
 
+def format_html(data):
+	return data.replace('<', '&lt;').replace('>', '&gt;')
+
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # DECODING DEFINITIONS FOR DATABASES
 # 
@@ -402,15 +415,30 @@ def decode_pwkey(pwkey, pwsalt):
 	else:
 		salt = hexlify(pack(">q", pwsalt)).decode()
 	print(' Cracking PIN, please wait...', end='\r')
-	for pin in range(0,10**8):
-		pin = str(pin).zfill(4)
-		h = hashlib.sha1((str(pin)+str(salt)).encode()).hexdigest()
-		if h.upper() == pwkey[:40]:
-			print(' PIN cracked: {0}'.format(pin)+' '*12)
-			return pin
-			break
+	if len(pwkey) == 40:
+		pwkey = unhexlify(pwkey)
+		for pin in map('{0:04}'.format,range(10**4)):
+			h0 = hashlib.sha1(('0'+pin+salt).encode()).digest()
+			for it in map(str,range(1,1024)):
+				h0 = hashlib.sha1(h0+(it+pin+salt).encode()).digest()
+			if h0 == pwkey:
+				print(' PIN cracked: {0}'.format(pin)+' '*12)
+				return pin
+				break
+		else:
+			ERRORS.append('PIN cracking was attempted, not successful.')
+	elif len(pwkey) == 72:
+		for pin in range(10**8):
+			pin = str(pin).zfill(4)
+			h = sha1((str(pin)+str(salt)).encode()).hexdigest()
+			if h.upper() == pwkey[:40]:
+				print(' PIN cracked: {0}'.format(pin)+' '*12)
+				return pin
+				break
+		else:
+			ERRORS.append('PIN cracking was attempted, not successful.')
 	else:
-		ERRORS.append('PIN cracking was attempted, not successful.')
+		ERRORS.append('The \'password.key\' file is odd length, PIN cracking failed.')
 # # # # #
 
 # Decode accounts.db  # # # # # # # # # # # # # # # # # # # # #
@@ -1144,6 +1172,48 @@ def decode_gcahistory(file_to_decode):
 		fileh.write(REP_FOOTER)
 	REPORT.append(['Web browser', '<a href="chrome_archived_history.html">{0} ({1:,})</a>'.format(rep_title, len(gcah_data))])
 # # # # #
+
+# Decode 'EmailProvider.db' # # # # # # # # # # # # # # # # # #
+def decode_emailprov(file_to_decode):
+	rep_title = 'E-mails'
+	EMP_PATH = 'email_body'+SEP
+	os.mkdir(OUTPUT+EMP_PATH)
+	with sq.connect(OUTPUT+'db'+SEP+file_to_decode) as c:
+		emp_auth = c.execute("SELECT protocol,address,port,login,password FROM HostAuth").fetchall()
+		emp_data = c.execute("SELECT _id,fromList,toList,subject,snippet,flagAttachment,timeStamp FROM Message ORDER BY timeStamp DESC").fetchall()
+		emp_body = sq.connect(OUTPUT+'db'+SEP+'EmailProviderBody.db').execute("SELECT messageKey,htmlContent,textContent FROM Body").fetchall()
+		with open(OUTPUT+'email-provider.html', 'w', encoding='utf-8') as fh:
+			fh.write(REP_HEADER.format(_title=rep_title))
+			if len(emp_auth) != 0:
+				fh.write('<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th>Protocol</th><th>Address</th><th>Port</th><th>Login</th><th nowrap bgcolor="#FF6666">Password</th></tr>\n')
+				for _ in emp_auth:
+					fh.write('<tr>\
+	<td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>\n'.format(*_))
+				fh.write('</table>\n<p/>')
+			if len(emp_data) != 0:
+				fh.write('<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1">\n<th>#</th><th>From</th><th>To</th><th>Subject</th><th width="300">Content (snippet)</th><th>Attachment</th><th nowrap>Time</th></tr>\n')
+				for _ in emp_data:
+					for _b in emp_body:
+						if _b[0] == _[0]:
+							ebody = _b[2]
+							if ebody == None:
+								ebody = _b[1]
+								open(OUTPUT+EMP_PATH+str(_b[0])+'.html', 'w', encoding='utf-8').write(ebody)
+								_link = str(_b[0])+'.html'
+							else:
+								open(OUTPUT+EMP_PATH+str(_b[0]), 'w', encoding='utf-8').write(ebody)
+								_link = str(_b[0])
+					_ = list(_)
+					_[1] = format_html(_[1])
+					_[2] = format_html(_[2])
+					_[3] = format_html(_[3])
+					_[4] = '<a href="{0}">{1}</a>'.format(str(EMP_PATH+_link),format_html(_[4]))
+					_[6] = unix_to_utc(_[6])
+					fh.write('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td width="300">{4}</td><td>{5}</td><td nowrap>{6}</td></tr>\n'.format(*_))
+			fh.write(REP_FOOTER)
+	REPORT.append(['Android E-mail', '<a href="email-provider.html">{0} ({1:,})</a>'.format(rep_title, len(emp_data))])
+# # # # #
+
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # DECODING DOWNLOADED DATABASES
 #
@@ -1158,6 +1228,7 @@ decoders = [
 (decode_logindata, 'Login Data'),
 (decode_gchistory, 'History'),
 (decode_gcahistory, 'Archived History'),
+(decode_emailprov, 'EmailProvider.db'),
 (decode_contacts2db, 'contacts2.db'),
 (decode_calls_contacts2db, 'contacts2.db'),
 (decode_logsdb, 'logs.db'),
