@@ -41,7 +41,7 @@ from webbrowser import open_new_tab
 # Setting variables
 __author__ = "Denis Sazonov"
 __version__ = "alpha-1.3.1"
-__build_date__ = "15-Feb-2014"
+__build_date__ = "16-Feb-2014"
 __website__ = "http://android.saz.lt"
 
 # Intro info print
@@ -388,10 +388,13 @@ def unix_to_utc(unix_stamp):
 
 def webkit_to_utc(webkit_stamp):
 	wtu0 = (datetime(1601,1,1) + timedelta(microseconds=int(webkit_stamp))).timetuple()
-	return unix_to_utc(int(time.mktime(wtu0)))
+	try:
+		return unix_to_utc(int(time.mktime(wtu0)))
+	except:
+		return None
 
 def format_html(data):
-	return data.replace('<', '&lt;').replace('>', '&gt;')
+	if data != None:	return data.replace('<', '&lt;').replace('>', '&gt;')
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # DECODING DEFINITIONS FOR DATABASES
@@ -747,10 +750,9 @@ def decode_photos_db(file_to_decode):
 	c = con.cursor()
 	c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='photos'")
 	if c.fetchone() != None:
-		c.execute("SELECT _id,owner,src_small,src_big,caption,created,thumbnail FROM photos ORDER BY _id DESC")
+		c.execute("SELECT _id,owner,src_small,src_big,caption,created FROM photos ORDER BY _id DESC")
 		fbp_data = c.fetchall()
 		if len(fbp_data) > 0:
-			os.mkdir(OUTPUT+'fb_media'); os.mkdir(OUTPUT+'fb_media'+SEP+'Thumbs')
 			fileh = open(OUTPUT+'fb_photos2.html', 'w', encoding='UTF-8')
 			fileh.write(REP_HEADER.format(_title=rep_title) + '<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th>#</th><th>Picture</th><th>Owner</th><th width="500">Caption</th><th nowrap>Date (uploaded)</th></tr>')
 			for fbp_item in fbp_data:
@@ -763,12 +765,6 @@ def decode_photos_db(file_to_decode):
 				else:
 					fbp_cap = str(fbp_item[4])
 				fbp_date = unix_to_utc(fbp_item[5])
-				if fbp_item[6] != None:
-					filewa = open(OUTPUT+'fb_media'+SEP+'Thumbs'+SEP+str(fbp_id)+'.jpg', 'wb')
-					filewa.write(fbp_item[6]); filewa.close()					
-					fbp_thumb = 'fb_media'+SEP+'Thumbs'+SEP+str(fbp_id)+'.jpg'
-				else:
-					fbp_thumb = fbp_item[2]
 				fileh.write('<tr><td>{0}</td><td><a href="{1}" target="_blank"><img src="{2}"></a></td><td><a href="http://www.facebook.com/profile.php?id={3}" target="_blank">{4}</a></td><td width="500">{5}</td><td nowrap>{6}</td></tr>\n'.format(fbp_id, fbp_img, fbp_thm, fbp_owner, fbp_owner, fbp_cap, fbp_date))
 			fileh.write(REP_FOOTER)
 			fileh.close()
@@ -1182,7 +1178,7 @@ def decode_emailprov(file_to_decode):
 		emp_auth = c.execute("SELECT protocol,address,port,login,password FROM HostAuth").fetchall()
 		emp_data = c.execute("SELECT _id,fromList,toList,subject,snippet,flagAttachment,timeStamp FROM Message ORDER BY timeStamp DESC").fetchall()
 		emp_body = sq.connect(OUTPUT+'db'+SEP+'EmailProviderBody.db').execute("SELECT messageKey,htmlContent,textContent FROM Body").fetchall()
-		with open(OUTPUT+'email-provider.html', 'w', encoding='utf-8') as fh:
+		with open(OUTPUT+'email-provider.html', 'w', encoding='UTF-8') as fh:
 			fh.write(REP_HEADER.format(_title=rep_title))
 			if len(emp_auth) != 0:
 				fh.write('<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th>Protocol</th><th>Address</th><th>Port</th><th>Login</th><th nowrap bgcolor="#FF6666">Password</th></tr>\n')
@@ -1198,16 +1194,18 @@ def decode_emailprov(file_to_decode):
 							ebody = _b[2]
 							if ebody == None:
 								ebody = _b[1]
-								open(OUTPUT+EMP_PATH+str(_b[0])+'.html', 'w', encoding='utf-8').write(ebody)
+								open(OUTPUT+EMP_PATH+str(_b[0])+'.html', 'w', encoding='UTF-8').write(ebody)
 								_link = str(_b[0])+'.html'
 							else:
-								open(OUTPUT+EMP_PATH+str(_b[0]), 'w', encoding='utf-8').write(ebody)
+								open(OUTPUT+EMP_PATH+str(_b[0]), 'w', encoding='UTF-8').write(ebody)
 								_link = str(_b[0])
+					else:
+						_link = ''
 					_ = list(_)
 					_[1] = format_html(_[1])
 					_[2] = format_html(_[2])
 					_[3] = format_html(_[3])
-					_[4] = '<a href="{0}">{1}</a>'.format(str(EMP_PATH+_link),format_html(_[4]))
+					if _[4] != None:	_[4] = '<a href="{0}">{1}</a>'.format(str(EMP_PATH+_link),format_html(_[4]))
 					_[6] = unix_to_utc(_[6])
 					fh.write('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td width="300">{4}</td><td>{5}</td><td nowrap>{6}</td></tr>\n'.format(*_))
 			fh.write(REP_FOOTER)
