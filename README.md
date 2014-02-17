@@ -63,6 +63,7 @@ Non-rooted devices (via backup method, Android versions 4.x and above)
 - Android browser browsing history
 - Google Chrome saved passwords
 - Google Chrome browsing history
+- E-mails and e-mail passwords
 - Facebook* chat messages
 - Facebook* user viewed photographs
 - Facebook* user notifications
@@ -85,6 +86,7 @@ Rooted devices (via root adbd or 'su' binary, any Android versions):
 - Android browser browsing history
 - Google Chrome saved passwords
 - Google Chrome browsing history
+- E-mails and e-mail passwords
 - Facebook* chat messages
 - Facebook* user viewed photographs
 - Facebook* user notifications
