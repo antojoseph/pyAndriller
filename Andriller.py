@@ -41,7 +41,7 @@ from webbrowser import open_new_tab
 # Setting variables
 __author__ = "Denis Sazonov"
 __version__ = "alpha-1.3.1"
-__build_date__ = "16-Feb-2014"
+__build_date__ = "17-Feb-2014"
 __website__ = "http://android.saz.lt"
 
 # Intro info print
@@ -1191,16 +1191,19 @@ def decode_emailprov(file_to_decode):
 				for _ in emp_data:
 					for _b in emp_body:
 						if _b[0] == _[0]:
-							ebody = _b[2]
+							ebody = _b[1]
 							if ebody == None:
-								ebody = _b[1]
-								open(OUTPUT+EMP_PATH+str(_b[0])+'.html', 'w', encoding='UTF-8').write(ebody)
-								_link = str(_b[0])+'.html'
-							else:
+								ebody = _b[2]
 								open(OUTPUT+EMP_PATH+str(_b[0]), 'w', encoding='UTF-8').write(ebody)
 								_link = str(_b[0])
+							else:
+								open(OUTPUT+EMP_PATH+str(_b[0])+'.html', 'w', encoding='UTF-8').write(ebody)
+								_link = str(_b[0])+'.html'
 					else:
-						_link = ''
+						try:
+							ebody
+						except:
+							_link = ''
 					_ = list(_)
 					_[1] = format_html(_[1])
 					_[2] = format_html(_[2])
