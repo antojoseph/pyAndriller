@@ -27,6 +27,7 @@ import tarfile
 import sqlite3 as sq
 from json import loads
 from io import BytesIO
+from cgi import escape
 from struct import pack
 from zlib import decompress
 from hashlib import md5,sha1
@@ -40,8 +41,8 @@ from webbrowser import open_new_tab
 
 # Setting variables
 __author__ = "Denis Sazonov"
-__version__ = "alpha-1.3.1"
-__build_date__ = "17-Feb-2014"
+__version__ = "alpha-1.3.2"
+__build_date__ = "21-Feb-2014"
 __website__ = "http://android.saz.lt"
 
 # Intro info print
@@ -284,7 +285,7 @@ DBLS = [
 '/data/system/users/0/accounts.db',
 '/data/system/users/0/photo.png',
 '/data/system/gesture.key',
-#'/data/system/cm_gesture.key',		# No decoder
+'/data/system/cm_gesture.key',		# No decoder
 '/data/system/locksettings.db',
 '/data/system/password.key',
 '/data/misc/wifi/wpa_supplicant.conf',
@@ -393,8 +394,11 @@ def webkit_to_utc(webkit_stamp):
 	except:
 		return None
 
-def format_html(data):
-	if data != None:	return data.replace('<', '&lt;').replace('>', '&gt;')
+def escape_html(data):
+	if data != None:
+		return escape(data)
+	else:
+		return ''
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # DECODING DEFINITIONS FOR DATABASES
@@ -413,7 +417,7 @@ def decode_gesturekey(file_to_decode):
 
 # Brute force 8-digit password  # # # # # # # # # # # # # # # #
 def decode_pwkey(pwkey, pwsalt):
-	if pwsalt >= 0:
+	if pwsalt > 0:
 		salt = '{:x}'.format(pwsalt)
 	else:
 		salt = hexlify(pack(">q", pwsalt)).decode()
@@ -421,9 +425,9 @@ def decode_pwkey(pwkey, pwsalt):
 	if len(pwkey) == 40:
 		pwkey = unhexlify(pwkey)
 		for pin in map('{0:04}'.format,range(10**4)):
-			h0 = hashlib.sha1(('0'+pin+salt).encode()).digest()
+			h0 = sha1(('0'+pin+salt).encode()).digest()
 			for it in map(str,range(1,1024)):
-				h0 = hashlib.sha1(h0+(it+pin+salt).encode()).digest()
+				h0 = sha1(h0+(it+pin+salt).encode()).digest()
 			if h0 == pwkey:
 				print(' PIN cracked: {0}'.format(pin)+' '*12)
 				return pin
@@ -476,9 +480,9 @@ def decode_logindata(file_to_decode):
 		with open(OUTPUT+'chrome_passwords.html', 'w', encoding='UTF-8') as fileh:
 			fileh.write(REP_HEADER.format(_title=rep_title)+'<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th nowrap>URL</th><th nowrap>Username</th><th nowrap bgcolor="#FF6666">Password</th><th nowrap>Date added</th></tr>\n')
 			for cpw_item in cpw_data:
-				cpw_url = cpw_item[0]
-				cpw_user = cpw_item[1]
-				cpw_pass = cpw_item[2].decode('UTF-8')
+				cpw_url = escape_html(cpw_item[0])
+				cpw_user = escape_html(cpw_item[1])
+				cpw_pass = escape_html(cpw_item[2].decode('UTF-8'))
 				cpw_date = unix_to_utc(cpw_item[3])
 				fileh.write('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>\n'.format(cpw_url,cpw_user,cpw_pass,cpw_date))
 			fileh.write(REP_FOOTER)
@@ -489,7 +493,7 @@ def decode_settingsdb(file_to_decode):
 	with sq.connect(OUTPUT+'db'+SEP+file_to_decode) as c:
 		try:
 			BT_MAC = c.execute("SELECT value FROM secure WHERE name = 'bluetooth_address'").fetchone()[0].lower()
-			BT_NAME = c.execute("SELECT value FROM secure WHERE name = 'bluetooth_name'").fetchone()[0]
+			BT_NAME = escape_html(c.execute("SELECT value FROM secure WHERE name = 'bluetooth_name'").fetchone()[0])
 			for findlt in REPORT:
 				if 'Local time' in findlt:
 					LotLoc = REPORT.index(findlt)
@@ -511,7 +515,7 @@ def decode_settingsdb(file_to_decode):
 			if 'password.key' in DLLS:
 				with open(OUTPUT+'db'+SEP+'password.key', 'r') as fileh:
 					PW_KEY = fileh.read()
-				if len(PW_KEY) == 72:
+				if len(PW_KEY) > 0:
 					PW_PIN = decode_pwkey(PW_KEY, int(PW_SALT))
 					if PW_PIN != None or PW_PIN != '':
 						REPORT.append(["Security (Lockscreen PIN)", PW_PIN])
@@ -519,7 +523,24 @@ def decode_settingsdb(file_to_decode):
 					ERRORS.append('The password.key file is odd length of {0} bytes.'.format(len(PW_KEY)))
 		except:
 			pass
+# # # # # 
 
+# Decode 'locksettings.db' for PIN  # # # # # # # # # # # # # #
+def decode_locksettings(file_to_decode):
+	with sq.connect(OUTPUT+'db'+SEP+file_to_decode) as c:
+		try:
+			PW_SALT = c.execute("SELECT value FROM locksettings WHERE name  = 'lockscreen.password_salt'").fetchone()[0]
+			if 'password.key' in DLLS:
+				with open(OUTPUT+'db'+SEP+'password.key', 'r') as fileh:
+					PW_KEY = fileh.read()
+				if len(PW_KEY) > 0:
+					PW_PIN = decode_pwkey(PW_KEY, int(PW_SALT))
+					if PW_PIN != None or PW_PIN != '':
+						REPORT.append(["Security (Lockscreen PIN)", PW_PIN])
+				else:
+					ERRORS.append('The password.key file is odd length of {0} bytes.'.format(len(PW_KEY)))
+		except:
+			pass
 # # # # # 
 
 # Decode contacts2.db (Pbook) # # # # # # # # # # # # # # # # #
@@ -559,7 +580,7 @@ def decode_contacts2db(file_to_decode):
 			for pb in pbook:
 				pb_index = pb.pop('index_key')
 				try:
-					pb_name = pb.pop('name')
+					pb_name = escape_html(pb.pop('name'))
 				except KeyError:
 					pb_name = ''
 				try:
@@ -612,9 +633,7 @@ def decode_calls_contacts2db(file_to_decode):
 						c2_number = 'UNKNOWN'
 				except:
 					pass
-				c2_name = c2_item[3]
-				if c2_name == None:
-					c2_name = ''
+				c2_name = escape_html(c2_item[3])
 				c2_date = unix_to_utc(c2_item[4])
 				c2_dur = str(timedelta(seconds=c2_item[5]))
 				fileh.write('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>\n'.format(c2_id, c2_type, c2_number, c2_name, c2_date, c2_dur))
@@ -654,9 +673,7 @@ def decode_logsdb(file_to_decode):
 					sec_number = 'UNKNOWN'
 			except:
 				pass
-			sec_name = sec_item[3]
-			if sec_name == None:
-				sec_name = ''
+			sec_name = escape_html(sec_item[3])
 			sec_date = unix_to_utc(sec_item[4])
 			sec_dur = str(timedelta(seconds=sec_item[5]))
 			fileh.write('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td><td>{5}</td></tr>\n'.format(sec_id, sec_type, sec_number, sec_name, sec_date, sec_dur))
@@ -679,7 +696,7 @@ def decode_mmssmsdb(file_to_decode):
 		fileh.write(REP_HEADER.format(_title=rep_title) + '<table border=1 cellpadding=2 cellspacing=0 align=center>\n<tr bgcolor=#72A0C1><th>#</th><th>Number</th><th width="500">Message</th><th>Type</th><th nowrap>Time</th></tr>\n')
 		for sms_item in sms_data:
 			sms_number = re.sub(r'(?<=\d)\s(?=\d)', '', str(sms_item[0]))
-			sms_text = str(sms_item[1])
+			sms_text = escape_html(str(sms_item[1]))
 			sms_time = unix_to_utc(sms_item[2])
 			if sms_item[3] == 1:
 				sms_typ = "Inbox"
@@ -716,7 +733,7 @@ def decode_threads_db2(file_to_decode):
 		fileh.write(REP_HEADER.format(_title=rep_title) + '<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th nowrap>Sender</th><th nowrap>Image</th><th width="500">Message</th><th nowrap>Recipient(s)</th><th>Time</th></tr>')
 		for fbt_item in fbt_data:
 			if fbt_item[0] != None:
-				fbt_sender_nm = loads(fbt_item[0]).get('name')
+				fbt_sender_nm = escape_html(loads(fbt_item[0]).get('name'))
 				fbt_sender_id = loads(fbt_item[0]).get('user_key')
 			else:
 				fbt_sender_nm = ''
@@ -727,7 +744,7 @@ def decode_threads_db2(file_to_decode):
 						fbt_img = loads(fbimgs[2])[0].get('url')
 					except:
 						fbt_img = fbimgs[2]
-			fbt_text = fbt_item[2]
+			fbt_text = escape_html(fbt_item[2])
 			fbt_time = unix_to_utc(fbt_item[3])
 			fbt_part = []
 			for fbtdic in loads(fbt_item[1]):
@@ -763,7 +780,7 @@ def decode_photos_db(file_to_decode):
 				if fbp_item[4] == None:
 					fbp_cap = ''
 				else:
-					fbp_cap = str(fbp_item[4])
+					fbp_cap = fbp_cap = escape_html(str(fbp_item[4]))
 				fbp_date = unix_to_utc(fbp_item[5])
 				fileh.write('<tr><td>{0}</td><td><a href="{1}" target="_blank"><img src="{2}"></a></td><td><a href="http://www.facebook.com/profile.php?id={3}" target="_blank">{4}</a></td><td width="500">{5}</td><td nowrap>{6}</td></tr>\n'.format(fbp_id, fbp_img, fbp_thm, fbp_owner, fbp_owner, fbp_cap, fbp_date))
 			fileh.write(REP_FOOTER)
@@ -789,14 +806,14 @@ def decode_notificationsdb(file_to_decode):
 			ntf_names = str('<br/>')+str(ntf_names[0])+str('<hr>')+'<br/>'.join(ntf_names[1:])
 		else:
 			ntf_names = str('<br/>')+str(ntf_names[0])
-		ntf_title = noti_d.get('title').get('text')
+		ntf_title = escape_html(noti_d.get('title').get('text'))
 		ntf_prof = noti_d.get('title').get('ranges')[0].get('entity').get('url')
 		ntf_name_img = noti_d.get('actors')[0].get('profile_picture').get('uri')
-		ntf_sum = noti_d.get('summary').get('text')
+		ntf_sum = escape_html(noti_d.get('summary').get('text'))
 		ntf_url = noti_d.get('url')
 		ntf_time = unix_to_utc(noti_d.get('creation_time'))
 		try:	# Message, if any.!
-			ntf_msg = noti_d.get('message').get('text')
+			ntf_msg = escape_html(noti_d.get('message').get('text'))
 		except:
 			ntf_msg = ''
 		try:	# Location, if any!
@@ -806,14 +823,14 @@ def decode_notificationsdb(file_to_decode):
 		except:
 			ntf_loc_name = ntf_loc_lat = ntf_loc_lon = ''
 		try:	# Attachments, if any!
-			ntf_att_title = noti_d.get('attachments')[0].get('title')
+			ntf_att_title = escape_html(noti_d.get('attachments')[0].get('title'))
 			ntf_att_img = noti_d.get('attachments')[0].get('media').get('image').get('uri')
 			ntf_att_thm = noti_d.get('attachments')[0].get('media').get('image_preview').get('uri')
 			ntf_att_desc = noti_d.get('attachments')[0].get('description').get('text').replace('\n', '<br/>')
 		except:
 			ntf_att_title = ntf_att_img = ntf_att_thm =ntf_att_desc = ''
 		try:	# Attached Story, if any!
-			ntf_atts_msg = noti_d.get('attached_story').get('message').get('text').replace('\r', '<br/>').replace('\n', '<br/>')
+			ntf_atts_msg = escape_html(noti_d.get('attached_story').get('message').get('text').replace('\r', '<br/>').replace('\n', '<br/>'))
 			ntf_atts_img = noti_d.get('attached_story').get('attachments')[0].get('media').get('image').get('uri')
 			ntf_atts_thm = noti_d.get('attached_story').get('attachments')[0].get('media').get('image_preview').get('uri')
 		except:
@@ -868,10 +885,7 @@ def decode_fbdb(file_to_decode):
 				fbp_owner = str(fbp_item[1])
 				fbp_thm = fbp_item[2]
 				fbp_img = fbp_item[3]
-				if fbp_item[4] == None:
-					fbp_cap = ''
-				else:
-					fbp_cap = str(fbp_item[4])
+				fbp_cap = escape_html(str(fbp_item[4]))
 				fbp_date = unix_to_utc(fbp_item[5])
 				if fbp_item[6] != None:
 					filewa = open(OUTPUT+'fb_media'+SEP+'Thumbs'+SEP+str(fbp_id)+'.jpg', 'wb')
@@ -927,7 +941,7 @@ def decode_msgstoredb(file_to_decode):
 			wam_id = wam_item[0]
 			wam_number = wam_item[1].split('@')[0]
 			if wam_number[0] != 0:	wam_number = '+' + wam_number.split('-')[0]
-			wam_text = wam_item[2]		# data
+			wam_text = escape_html(wam_item[2])		# data
 			wam_date = unix_to_utc(wam_item[3])
 			if wam_item[4] == 1:		# key_from_me
 				wam_dir = 'Sent'
@@ -968,7 +982,7 @@ def decode_kikDatabasedb(file_to_decode):
 		kik_id = kik_item[0]
 		kik_num = kik_item[2]
 		if kik_item[5] != 0:
-			kik_msg = str(kik_item[1])
+			kik_msg = escape_html(str(kik_item[1]))
 		else:
 			kik_msg = 'Media Content ID: '+kik_item[6]
 		if kik_item[3] == 1:
@@ -1009,7 +1023,7 @@ def decode_masterdb(file_to_decode):
 		else:
 			bbm_msgtype = 'Sent'
 		bbm_msgtime = unix_to_utc(bbm_item[3])
-		bbm_msgtxt = str(bbm_item[4])
+		bbm_msgtxt = escape_html(str(bbm_item[4]))
 		if bbm_item[5] != None:
 			bbm_msgimg = str('<i>Image #')+str(bbm_item[5])+str('</i>')
 		else:
@@ -1087,7 +1101,7 @@ def decode_browser2(file_to_decode):
 	with open(OUTPUT+'browser_history.html', 'w', encoding='UTF-8') as fileh:
 		fileh.write(REP_HEADER.format(_title=rep_title) + '<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th>Page title</th><th>URL</th><th>Time</th><th>Frequency</th></tr>\n')
 		for wbh_item in wbh_data:
-			wbh_s_title = wbh_item[0]
+			wbh_s_title = escape_html(wbh_item[0])
 			if len(wbh_item[0]) > 60:	wbh_s_title = wbh_s_title[:55]+'.....' 
 			wbh_s_url = wbh_item[1]
 			if len(wbh_item[1]) > 60:	wbh_s_url = wbh_s_url[:45]+'.....'+wbh_s_url[-10:]
@@ -1117,7 +1131,7 @@ def decode_gchistory(file_to_decode):
 	with open(OUTPUT+'chrome_history.html', 'w', encoding='UTF-8') as fileh:
 		fileh.write(REP_HEADER.format(_title=rep_title) + '<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th>Page title</th><th>URL</th><th>Time</th><th>Frequency</th></tr>\n')
 		for gch_item in gch_data:
-			gch_s_title = gch_item[0]
+			gch_s_title = escape_html(gch_item[0])
 			if len(gch_item[0]) > 60:	gch_s_title = gch_s_title[:55]+'.....' 
 			gch_s_url = gch_item[1]
 			if len(gch_item[1]) > 60:	gch_s_url = gch_s_url[:45]+'.....'+gch_s_url[-10:]
@@ -1147,7 +1161,7 @@ def decode_gcahistory(file_to_decode):
 	with open(OUTPUT+'chrome_archived_history.html', 'w', encoding='UTF-8') as fileh:
 		fileh.write(REP_HEADER.format(_title=rep_title) + '<table border="1" cellpadding="2" cellspacing="0" align="center">\n<tr bgcolor="#72A0C1"><th>Page title</th><th>URL</th><th>Time</th><th>Frequency</th></tr>\n')
 		for gcah_item in gcah_data:
-			gcah_s_title = gcah_item[0]
+			gcah_s_title = escape_html(gcah_item[0])
 			if len(gcah_item[0]) > 60:	gcah_s_title = gcah_s_title[:55]+'.....' 
 			gcah_s_url = gcah_item[1]
 			if len(gcah_item[1]) > 60:	gcah_s_url = gcah_s_url[:45]+'.....'+gcah_s_url[-10:]
@@ -1205,11 +1219,11 @@ def decode_emailprov(file_to_decode):
 						except:
 							_link = ''
 					_ = list(_)
-					_[1] = format_html(_[1])
-					_[2] = format_html(_[2])
-					_[3] = format_html(_[3])
-					if _[4] != None:	_[4] = '<a href="{0}">{1}</a>'.format(str(EMP_PATH+_link),format_html(_[4]))
-					_[6] = unix_to_utc(_[6])
+					_[1] = re.sub('\x01|\x02', '<br/>', escape_html(_[1]))
+					_[2] = re.sub('\x01|\x02', '<br/>', escape_html(_[2]))
+					_[3] = escape_html(_[3])	# subject
+					if _[4] != None:	_[4] = '<a href="{0}">{1}</a>'.format(str(EMP_PATH+_link),escape_html(_[4]))		# body snippet
+					_[6] = unix_to_utc(_[6])	
 					fh.write('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td width="300">{4}</td><td>{5}</td><td nowrap>{6}</td></tr>\n'.format(*_))
 			fh.write(REP_FOOTER)
 	REPORT.append(['Android E-mail', '<a href="email-provider.html">{0} ({1:,})</a>'.format(rep_title, len(emp_data))])
@@ -1221,6 +1235,7 @@ def decode_emailprov(file_to_decode):
 decoders = [
 (decode_gesturekey, 'gesture.key'),
 (decode_settingsdb, 'settings.db'),
+(decode_locksettings, 'locksettings.db'),
 (decode_accountsdb, 'accounts.db'),
 (decode_wifipw, 'wpa_supplicant.conf'),
 (decode_wifipw, 'flattened-data'),
